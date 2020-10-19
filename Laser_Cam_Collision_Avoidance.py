@@ -7,6 +7,7 @@
 
 #!/usr/bin/env python
 import rospy
+import time
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from sensor_msgs.msg import Image
@@ -20,9 +21,16 @@ import cv_bridge
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float32
+import scipy.io as sio
+import os
 
 #print cv2.__version__
 range=([0])
+Laser_center_point=[]
+Depth_center_point=[]
+Laser_Depth_Error=[]
+Time_difference=[]
+
 def callback(msg):
     print("Hiiiii")
     global range
@@ -92,38 +100,58 @@ class Nodo(object):
     #  Initialization subscription and publishing to Topics
     def __init__(self):
         # Node cycle rate (in Hz).
+        
+        print("******      Code Started     ********")
+        self.Initial_time=time.time()
+        self.Execution_time= 4  # Execution time in Mins.
+        self.Run_time=self.Execution_time*60
         self.loop_rate = rospy.Rate(60)
         # Subscribers
         rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image,callback=self.convert_depth_image, queue_size=1)
-        #rospy.Subscriber("/camera/color/image_raw", Image,callback=self.convert_depth_image, queue_size=1)
         rospy.Subscriber('/scan', LaserScan, self.callback)
         # Publishers
-        self.velocity_publisher = rospy.Publisher('/base/cmd_vel', Twist, queue_size=10)
+        #self.velocity_publisher = rospy.Publisher('/base/cmd_vel', Twist, queue_size=10)
         self.Cam_Laser_Error_publisher = rospy.Publisher('/Cam_Lasr_Error', Float32, queue_size=10)
         #self.Laser()
     def convert_depth_image(self,ros_image):
         self.bridge = CvBridge()
-        # Use cv_bridge() to convert the ROS image to OpenCV format
-        #try:
-        #Convert the depth image using the default passthrough encoding
         self.depth_image = self.bridge.imgmsg_to_cv2(ros_image, desired_encoding="passthrough")
         self.depth_array = np.array(self.depth_image, dtype=np.float32)
         self.center_idx = np.array(self.depth_array.shape) / 2
         self.Cam_Dist=(self.depth_array[self.center_idx[0], self.center_idx[1]])/1000
+        self.Depth_Time=time.time()
         self.Laser_Dist=range[0]
         self.Error = Float32()
-        self.Error.data=abs(self.Cam_Dist-self.Laser_Dist) 
-        print(self.Error)
+        self.Error=abs(self.Cam_Dist-self.Laser_Dist) *100
         self.Cam_Laser_Error_publisher.publish(self.Error)
-        #print ('D435-Camera - Center Depth (m): ', self.Cam_Dist,'Laser- Center Beam (m) (after position translation): ',self.Laser_Dist,"  Error  = ",abs(self.Cam_Dist-self.Laser_Dist))
-        #print(range[0])
-        #print(self.depth_array)
-        #except CvBridgeError, e:
-            #print e
-        #Convert the depth image to a Numpy array
+        Time_difference.append(abs(self.Laser_Time-self.Depth_Time))
+        Laser_center_point.append(self.Laser_Dist)
+        Depth_center_point.append(self.Cam_Dist)
+        Laser_Depth_Error.append(self.Error)
+        self.Time_Out=time.time()-self.Initial_time
+        
+        if (self.Time_Out > self.Run_time):
+            print("code was executed for ",self.Time_Out/60,"  Minutes.......check your .mat file please")
+            sio.savemat('/home/mohammed/Laser_Cam_Collision_Avoidance/Sensor_Diffusion_output.mat',{'Laser_center_point':Laser_center_point,'Depth_center_point':Depth_center_point,'Laser_Depth_Error':Laser_Depth_Error,'Time_difference':Time_difference})
+            os._exit(0)
+            
+
+
+        #print ('D435-Camera - Center Depth (m): ', self.Cam_Dist,'Laser- Center Beam (m) (after position translation): ',self.Laser_Dist,"  Error (cm) = ",self.Error)
+        # print("********************************************")
+        # print(Laser_center_point)
+        # print("")
+        # print(Depth_center_point)
+        # print("")
+        # print(Laser_Depth_Error)
+        # print("********************************************")
+        #print(Time_difference)
+
+
     def callback(self,msg):
-        #print("Hiiiii")
         range[0]=msg.ranges[540]
+        self.Laser_Time=time.time()
+        
 
     def Laser(self):
         # Starts a new node
