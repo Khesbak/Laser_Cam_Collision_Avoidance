@@ -1,10 +1,5 @@
 
 
-
-
-
-
-
 #!/usr/bin/env python
 import rospy
 import time
@@ -118,7 +113,14 @@ class Nodo(object):
         self.depth_image = self.bridge.imgmsg_to_cv2(ros_image, desired_encoding="passthrough")
         self.depth_array = np.array(self.depth_image, dtype=np.float32)
         self.center_idx = np.array(self.depth_array.shape) / 2
-        self.Cam_Dist=(self.depth_array[self.center_idx[0], self.center_idx[1]])/1000
+        # The center point is (540,960)
+        #self.Cam_Dist=(self.depth_array[self.center_idx[0], self.center_idx[1]])/1000
+        
+        self.size=2
+        #self.Cam_Dist_acc=(self.depth_array[(540-self.size):(540+self.size), (960-self.size):(960+self.size)])/1000
+        self.Cam_Dist=((self.depth_array[540-self.size:540+self.size+1, 960-self.size:960+self.size+1])/1000).sum()/( (2*self.size+1) * (2*self.size+1) )
+        # print(self.Cam_Dist)
+        # print("")
         self.Depth_Time=time.time()
         self.Laser_Dist=range[0]
         self.Error = Float32()
@@ -130,9 +132,12 @@ class Nodo(object):
         Laser_Depth_Error.append(self.Error)
         self.Time_Out=time.time()-self.Initial_time
         
+        #print(Depth_center_point,"   ",Laser_center_point)
+        #print("")
+        
         if (self.Time_Out > self.Run_time):
             print("code was executed for ",self.Time_Out/60,"  Minutes.......check your .mat file please")
-            sio.savemat('/home/mohammed/Laser_Cam_Collision_Avoidance/Complex_Target_Area_2min_motion.mat',{'Laser_center_point':Laser_center_point,'Depth_center_point':Depth_center_point,'Laser_Depth_Error':Laser_Depth_Error,'Time_difference':Time_difference})
+            sio.savemat('/home/mohammed/Laser_Cam_Collision_Avoidance/motion_4_point_test1.mat',{'Laser_center_point':Laser_center_point,'Depth_center_point':Depth_center_point,'Laser_Depth_Error':Laser_Depth_Error,'Time_difference':Time_difference})
             os._exit(0)
             
 
